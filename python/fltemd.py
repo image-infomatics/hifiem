@@ -1,5 +1,16 @@
+'''
+Filename:       fltemd
+Created:        25-Jan-2021
+Author:         Yuri Kreinin
+Description:    This file contains common methods and algorithms used in preprocessing of electron microscopy
+                images.
+'''
+
+
+
+
 import numpy as np, gc, time, cv2 as cv
-from math import floor, sqrt, ceil, radians, exp, sin, cos, degrees
+from math import floor, sqrt, ceil, radians, exp, sin, cos
 from contextlib import nullcontext
 from scipy.ndimage import convolve, convolve1d, maximum_filter, minimum_filter, generate_binary_structure, maximum_filter1d, \
     label, binary_dilation, correlate1d, distance_transform_edt
@@ -15,6 +26,21 @@ timedelta_to_string = _timedelta_to_string
 
 #===========================================================================================================================================
 def conv2d(image, kern):
+    '''
+        a simple helper for 2-dimensional separable convolution, based on openCV method
+
+    Parameters
+    ----------
+    image : numpy array
+        2d or 3d numpy array, as defined by cv2.filter2D
+    kern : one dimensional numpy array or object of class kernel, defined below
+        one dimensional convolutional filter to be applied in both directions
+
+    Returns
+    -------
+    numpy array of the same shape as input
+        result of 2d convolution
+    '''
     if isinstance(kern, kernel): kern = kern.kern
 
     # applying cv.sepFilter2D is meaningfully slower than cv.filter2D
@@ -29,10 +55,50 @@ def conv2d(image, kern):
 
 #===========================================================================================================================================
 def mean2d(image, size):
+    '''
+        a simple helper for 2-dimensional block filter based on openCV blur function
+
+    Parameters
+    ----------
+    image : numpy array
+        2d or 3d numpy array, as defined by cv2.blur
+    size : int or tuple or list of ints
+        defines the size of 2d block kernel. If integer scalar is provided as a parameter
+        then the kernel is assumed to be square
+
+    Returns
+    -------
+    numpy array of the same shape as input
+        result of applying 2d block filter
+
+    '''
     return cv.blur(image, (size, size) if np.isscalar(size) else size)
 
 #===========================================================================================================================================
 def preprocess_image(image, kern = None, percentile = 2, dtype = None, rescale = None):
+    '''
+        this method is used to preprocess and normalize image to the positive range starting with zero (usually 0..1).
+        It also may clip outlier values and apply a 2d convolution filter
+
+    Parameters
+    ----------
+    image : numpy array
+        2d or 3d numpy array
+    kern : numpy array
+        The default is None, otherwise contains one-dimensional separable filter.
+    percentile : int or None, optional
+        The percentile to be used to clip intensity outliers. The default is 2.
+    dtype : numpy.dtype, optional
+        Specifies a type to convert output. The default is None, which means that result is np.float32 or np.float64
+    rescale : float or integer, optional
+        Specifies the upper-bound of output intensity range. The default is None, which results in 1
+
+    Returns
+    -------
+    image : TYPE
+        DESCRIPTION.
+
+    '''
     if not kern is None:
         image = conv2d(image, kern)
     if percentile:
