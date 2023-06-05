@@ -43,6 +43,10 @@ Here is a brief description of the main files in the project:
 
 - **pipeline.ipynb**: jupyter notebook, which demonstrates the key methods used in pre-processing pipeline
 
+### Download image section
+
+    cd data 
+    wget https://s3.us-east-2.amazonaws.com/ccn-connectomics-mega-ng/jwu/05600.tif
 
 ## Required python packages
 
