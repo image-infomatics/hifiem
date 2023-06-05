@@ -6,9 +6,6 @@ Description:    This file contains common methods and algorithms used in preproc
                 images.
 '''
 
-
-
-
 import numpy as np, gc, time, cv2 as cv
 from math import floor, sqrt, ceil, radians, exp, sin, cos
 from contextlib import nullcontext
@@ -78,7 +75,7 @@ def mean2d(image, size):
 def preprocess_image(image, kern = None, percentile = 2, dtype = None, rescale = None):
     '''
         this method is used to preprocess and normalize image to the positive range starting with zero (usually 0..1).
-        It also may clip outlier values and apply a 2d convolution filter
+        It also may clip outlier values and apply a 2d convolution filter prior to other operations
 
     Parameters
     ----------
@@ -251,210 +248,14 @@ class kernel:
         return kernel(kernel.sub_kernels(self, kern)[0])
 
 #===========================================================================================================================================
-def denoise_v_1_02(image, ndims = None, scales = 4, wsize = 7, enhance = 2.5):
-    '''
-    The method for volume de-nosing and enhancement. It receives the following arguments:
-        image - n-dimensional array to be processed, it is recommended to be casted to np.float32
-        ndims = None, number of convolution dimensions equals to image dimensions by default (None)
-        scales = 4, number of scales (dilations of low-pass kernel - kernel.kernHxH)
-        wsize  = 7, number of taps for one-dimensional separable averaging filter
-        enhance = 2.5, multipler applied to mid-pass component (lp_hipass)
-    Examples of usage:
-        denoised = denoise_v_1_02(rawdata.astype(np.float32)) - use the default parameters
-        - or -
-        denoised = denoise_v_1_02(rawdata.astype(np.float32), ndims = 3, scales = 2, enhance = 2) - use the custom parameters
-    '''
-    print("Start denoising")
-    ndims  = ndims if not ndims is None else image.ndim
-    kernA  = kernel((np.ones((wsize,), dtype = kernel.kernHxH.dtype) / wsize) if np.isscalar(wsize) else wsize) # wsize contains kernel weights
-    kernLP = kernel()
-
-    # NRATIO = @(image, hipass, lopass, kern) COVAR(lopass, hipass, kern) ./ (VAR(hipass, kern));
-    # WGTS = @(beta, nratio) exp(-2 * nratio .* (nratio > 0));
-
-    CONVN   = lambda x, kern: kern.convn(x, ndims = ndims)
-    VAR     = lambda x, kern: CONVN(np.square(x), kern) - np.square(CONVN(x, kern))
-    NRATIO  = lambda lp, hp, kern: (CONVN(np.multiply(lp, hp), kern) - np.multiply(CONVN(lp, kern), CONVN(hp, kern))) / (VAR(hp, kern) + np.finfo(np.float32).eps)
-    WEIGHTS = lambda x: np.exp(-2 * x * (x > 0).astype(x.dtype))
-
-    # high-frequency denoise
-    lopass = kernLP.convn(image, ndims = ndims)
-    hipass = image - lopass
-
-    # kernHP = kernel(kernLP.complement())
-
-    lp_hipass = kernLP.convn(hipass, ndims = ndims)
-    lp_hipass = 2 * lp_hipass - kernLP.convn(lp_hipass, ndims = ndims)
-    hp_hipass  = hipass - lp_hipass
-
-    nratio  = NRATIO(lopass + lp_hipass, hp_hipass, kernA)
-    weights = WEIGHTS(nratio)
-    output  = input = image - hp_hipass * weights + enhance * lp_hipass
-
-    print("Hipass is done")
-
-    for scaleIdx in range(scales):
-        kernLP = kernel().dilate(scaleIdx, as_kernel = True)
-        if np.isscalar(wsize):
-            kernA  = np.ones(((wsize - 1) * (1 << scaleIdx) + 1,), dtype = kernLP.kern.dtype)
-            kernA = kernel(kernA / kernA.size)
-        else:
-            kernA = kernel(wsize).dilate(scaleIdx, as_kernel = True)
-
-        lopass  = kernLP.convn(input, ndims = ndims)
-        hipass  = input - lopass
-        nratio  = NRATIO(lopass, hipass, kernA)
-        weights = WEIGHTS(nratio)
-        output  = output - hipass * weights
-        input   = lopass
-
-        print(f"Denoised scale {scaleIdx}")
-
-    return output
-
-#===========================================================================================================================================
 def conndef(ndims, minimal = True):
     return generate_binary_structure(ndims, 1) if minimal else np.ones(ndims * (3,), dtype = bool)
 
 #===========================================================================================================================================
-def denoise_v_2_00(image, ndims = None, scales = 3, wsize = 7, enhance = 0, sigma = 0.25, split_hipass = True, propagate_noise = True,
-                   crop_nratio = True, lsize = None, verbose = False):
-    '''
-    The method for volume de-nosing and enhancement. Replicates matlab function EmdLib.Denoise_v_4_00
-
-    Parameters
-    ----------
-    image : n-dimensional array to be processed
-        it is recommended to be casted to np.float32
-    ndims : integer scalar, optional
-        number of convolution dimensions equals to image dimensions by default (None)
-    scales : integer scalar, optional
-        number of scales (dilations of low-pass kernel - kernel.kernHxH). The default is 3.
-    wsize : integer scalar, optional
-        number of taps for the one-dimensional separable averaging filter used to calculate local statisitcs. The default is 7.
-    enhance : float, optional
-        multipler applied to mid-pass component (lp_hipass). The default is 0.
-    sigma : float, optional
-        used as a divider in calculation of noise weights (WEIGHTS function). The default is 0.25.
-    split_hipass : boolean, optional
-        The default is True.
-    propagate_noise : boolean, optional
-        The default is True.
-    crop_nratio : boolean, optional
-        The default is True.
-    lsize : TYPE, optional
-        number of taps for one-dimensional separable averaging filter used to calculate "global" statistics, e.g. large block filter
-        None specifies that the size of the window is based on the size of the image, as approx one quarter of the largest dimension.
-        The default is None.
-    verbose : boolean, optional
-        The default is True.
-
-    Examples of usage:
-        >>> denoised = denoise_v_2_00(rawdata.astype(np.float32)) - use the default parameters
-        - or -
-        >>> denoised = denoise_v_2_00(rawdata.astype(np.float32), ndims = 3, scales = 2, enhance = 0.5) - use the custom parameters
-
-    Returns
-    -------
-    ndarray of np.float32
-    '''
-    if verbose: print("Start denoising")
-    ndims  = image.ndim if ndims is None else ndims
-    kernA  = kernel(np.ones((wsize,), dtype = kernel.kernHxH.dtype) / wsize) # wsize contains kernel weights
-    lsize  = 2 * floor(max(image.shape) / 8) + 1 if lsize is None else lsize
-    kernL  = kernel((np.ones((lsize,), dtype = kernel.kernHxH.dtype) / lsize) if np.isscalar(lsize) else lsize) # lsize contains kernel weights
-    kernLP = kernel(copy = True)
-    # strel  = conndef(ndims, min_connect)
-    emul   = 1 / sigma
-
-    # define simple functions
-    KERN_ND = lambda kern: kernel((kern if isinstance(kern, kernel) else kernel(kern)).kern_nd(ndims = ndims))
-    CONVN   = lambda x, kern: (kern if isinstance(kern, kernel) else kernel(kern)).convn(x, ndims = ndims)
-    VAR     = lambda x, kern: CONVN(np.square(x), kern) - np.square(CONVN(x, kern))
-    COVAR   = lambda lp, hp, kern: CONVN(np.multiply(lp, hp), kern) - np.multiply(CONVN(lp, kern), CONVN(hp, kern))
-    BETA    = lambda lp, hp: struct(lp = np.sum(np.square(lp.kern)), hp = np.sum(np.square(hp.kern)), cov = np.sum((hp * lp).kern))
-
-    def STD(x, kern):
-        var = VAR(x, kern)
-        var[var < 0] = 0
-        return np.sqrt(var, out = var)
-
-    if np.issubdtype(image.dtype, np.integer):
-        image = image.astype(kernel.kernHxH.dtype)
-
-    eps = np.finfo(np.float32).eps
-    std_image = STD(image, kernL)
-
-    # define noise estimation functions
-    NRATIO  = lambda lp, hp, kern, cov, beta: np.nan_to_num((COVAR(lp, hp, kern) - cov * VAR(image, kern)) / (sqrt(beta) * np.multiply(std_image, STD(hp, kernL)) + eps), copy = False)
-    WEIGHTS = lambda x, crop = crop_nratio: np.exp(-emul * (np.maximum(x, 0) if crop else np.abs(x)))
-
-    def TRACE(scaleNo):
-        if verbose:
-            nans = np.count_nonzero(np.isnan(hipass))
-            print(f"Band {scaleNo}: lp = {sqrt(beta.lp):.2%}, hp = {sqrt(beta.hp):.2%}, cov = {1000 * beta.cov:.2}", \
-                end = None if nans == 0 else f" nans = {nans / hipass.size : %}\n")
-
-    # process the highest frequency component
-    lopass = CONVN(image, kernLP)
-    hipass = image - lopass
-
-    if split_hipass:
-        # high-frequency decomposition
-        lp_hipass = CONVN(2 * hipass - CONVN(hipass, kernLP), kernLP) # lp_hipass contains low frequency part of hipass
-        hipass   -= lp_hipass # hipass contains high frequency component
-
-        kern = struct(lp = 3 * (KERN_ND(kernLP) - KERN_ND(np.correlate(kernLP.kern, kernLP.kern, mode = 'full'))) \
-                + KERN_ND(np.correlate(np.correlate(kernLP.kern, kernLP.kern, mode = 'full'), kernLP.kern, mode = 'full')))
-        beta    = BETA(kern.lp, ~kern.lp)
-        noise   = np.multiply(hipass, WEIGHTS(NRATIO(lopass + lp_hipass, hipass, kernA, beta.cov, beta.hp)))
-        details = hipass - noise
-        TRACE("0.Hi")
-
-        # denoise low frequency component of hipass
-        beta   = BETA(KERN_ND(kernLP), kern.lp - KERN_ND(kernLP))
-        hipass = np.multiply(lp_hipass, WEIGHTS(NRATIO(lopass, lp_hipass, kernA, beta.cov, beta.hp))) # hipass temporary stores noise
-        lp_hipass -= hipass
-
-        details += lp_hipass if enhance == 0 else ((1 + enhance) * lp_hipass)
-        noise   += hipass
-        TRACE("0.Lo")
-    else:
-        beta = BETA(KERN_ND(kernLP), ~KERN_ND(kernLP))
-        noise   = np.multiply(hipass, WEIGHTS(NRATIO(lopass, hipass, kernA, beta.cov, beta.hp)))
-        details = (hipass - noise) if enhance == 0 else ((1 + enhance) * (hipass - noise))
-        TRACE("0")
-
-    # process the rest of scales
-    kern = struct(lp = kernLP.kern)
-    for scaleIdx in range(1, scales):
-        hipass = lopass # temporary stores previous lopass
-        if propagate_noise and scaleIdx > 0:
-            hipass += CONVN(noise, kernLP.dilate(scaleIdx-1))
-
-        kern.next = kernLP.dilate(scaleIdx)
-        lopass  = CONVN(hipass, kern.next)
-        hipass -= lopass
-
-        kern.prev = kern.lp # kern.lp is one-dimensional matrix
-        kern.lp = np.correlate(kern.lp, kern.next, mode = 'full')
-        beta = BETA(KERN_ND(kern.lp), KERN_ND(kern.prev) - KERN_ND(kern.lp))
-
-        kernA = np.ones(((wsize - 1) * (1 << scaleIdx) + 1,), dtype = kernLP.kern.dtype)
-        kernA = kernel(kernA / kernA.size)
-
-        noise = np.multiply(hipass, WEIGHTS(NRATIO(lopass, hipass, kernA, beta.cov, beta.hp)))
-        details += hipass - noise
-        TRACE(scaleIdx)
-
-    return lopass + details
-
-#===========================================================================================================================================
 def denoise_v_2_10(image, sigmoid_params: list, ndims = None, scales = 3, wsize = 7, split_hipass = True, propagate_noise = True):
     '''
-    The method for volume de-nosing. Replicates matlab function EmdLib.Denoise_v_4_10, applies the similar denoise mechanism, as ver.4.00,
-    derived on noise estimation based on covariance between low- and high-pass bands, but this method differs from previous version because
-    it uses sigmoid function with parametrized coefficients
+    The method for volume de-nosing. The noise estimation is done based on covariance between low- and high-pass bands,
+    a suppression ratio is attenuated  by sigmoid function with parametrized coefficients
 
     Parameters
     ----------
