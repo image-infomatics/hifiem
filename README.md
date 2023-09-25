@@ -66,7 +66,7 @@ opencv>=4.5.5
 ```bibtex
 @article{kreinin2023high,
   title={High-fidelity Image Restoration of Large 3D Electron Microscopy Volume},
-  author={Kreinin, Yuri and Gunn, Pat and Chklovskii, Dmitri and \textbf{Jingpeng Wu}\dagger},
+  author={Kreinin, Yuri and Gunn, Pat and Chklovskii, Dmitri and Jingpeng Wu},
   journal={bioRxiv},
   pages={2023--09},
   year={2023},
