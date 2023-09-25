@@ -1,4 +1,4 @@
-# Preprocessing Pipeline of Electron Microscope Images for sample# 3
+# Preprocessing Pipeline of Volume Electron Microscope Images
 
 The software incorporates various methods used in a multi-step pre-processing pipeline specifically designed to improve the image quality of specimen #3. These methods serve as essential components within the broader pipeline, which can be executed on a computational cluster. The input image consists of a stack of 11260 re-aligned sections, each with dimensions of 13750 x 9000 pixels. The image files are stored in .tif format, and the intensity values are represented as unsigned 16-bit. It is worth noting that the original intensity values are inverted. Additionally, the actual dynamic range of the images is notably lower than the available range of intensity.
 
