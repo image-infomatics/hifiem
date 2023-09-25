@@ -62,3 +62,15 @@ scipy>=1.6.2
 opencv>=4.5.5
 ```
 
+# Publication
+```bibtex
+@article{kreinin2023high,
+  title={High-fidelity Image Restoration of Large 3D Electron Microscopy Volume},
+  author={Kreinin, Yuri and Gunn, Pat and Chklovskii, Dmitri and \textbf{Jingpeng Wu}\dagger},
+  journal={bioRxiv},
+  pages={2023--09},
+  year={2023},
+  publisher={Cold Spring Harbor Laboratory},
+  doi = {10.1101/2023.09.14.557785}
+}
+```
