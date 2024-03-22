@@ -62,6 +62,29 @@ scipy>=1.6.2
 opencv>=4.5.5
 ```
 
+# FAQ
+## How many scales are in step 1 of de-stripping? How do you determine how many scales are needed?
+In the process of decomposing the input image into multiple scales using a bank of separable filters, the determination of the number of scales is guided by the imperative to effectively address stripe artifacts. The decision on how many scales to employ is based on observing the presence of stripes in the approximation (low-pass component) at each scale. As a standard practice, we systematically review the approximation at different scales until we are certain that the resulting low-pass component sufficiently minimizes stripe artifacts. In our experience, this determination often converges around approximately 6 scales. It is worth noting that exceeding the sufficient number of scales is generally safe, as it tends to have a minor, if any, negative impact on the overall improvement. However, increasing the number of scales beyond the critical point involves unnecessary computations without meaningful improvement in artifact reduction. Therefore, the chosen number of scales strikes a balance between computational efficiency and achieving the desired outcome in terms of stripe artifact suppression.
+
+## How is the rectangular block filter size N determined?  What values were used here? How many N needed to be tried to figure out the “best”
+During the experimental phase of our study, determining the "best" value for the rectangular block filter size N, the size of the rectangular block filter, played a crucial role in optimizing performance at each scale. We systematically explored various values for N to evaluate their impact on weight map smoothing and, consequently, the overall algorithm performance. A heuristic rule guided these selections, ensuring that the size N of the block filter is meaningfully less than the compound Field of View of the convolution kernel used to decompose each scale. For each scale, experiments were conducted with different values of N, observing the effects on the algorithm's performance. After thorough experimentation, values in the following Table were selected for optimal performance at each scale for our EM datasets.
+| Scale        | FoV           | Block Filter Size N |
+| ------------- |:-------------:| -----:|
+| 1      | 7 | 5 |
+| 2      | 19 | 9 |
+| 3      | 43 | 13 |
+| 4      | 91 | 19 |
+| 5      | 187 | 43|
+| 6      | 379 | 75 |
+| 7      | 763 | 91 |
+
+
+## How would the neighborhood size Ω vary with resolution?
+The primary goal of our contrast adjustment approach is to enhance the visibility of specific neuropil structures, such as plasma membranes and T-bars. The size of these structures increases with rising resolution. However, this doesn't necessarily imply the need for an increase in the neighborhood size (Ω), as higher resolution tends to improve overall image quality and details. Consequently, the demand for contrast enhancement may decrease with higher spatial resolution. Notably, the selection of the neighborhood size (Ω) is not solely contingent on resolution but is influenced by a diverse range of image characteristics.
+
+In our methodology, we anticipate a relatively small neighborhood size, typically ranging from 5x5 to 13x13 pixels. The precise size is determined empirically through experimentation and visual inspection of the achieved improvements.
+
+
 # Publication
 ```bibtex
 @article{kreinin2023high,
