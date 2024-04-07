@@ -1165,20 +1165,23 @@ def deband_v_3_00(image, direction = "horizontal", bwmask = None, scales = 6, ad
                 bands  = CONV(hipass * bwtemp, kernA)
 
         elif params.method == "predict":
-
+            # the 3 dimensional input processing has to be reviewed, because it is not clear how regionprops handles zyx image
             strel = conndef(2, minimal = False)
             if image.ndim == 3: strel = strel[np.newaxis, ...]
 
             if verbose: print(performance_time(f"scale {scale_idx} start prediction", start))
-            bwtemp = np.fabs(hipass) > threshold
+            bwtemp = hipass > threshold
             if not bwmask is None: bwtemp &= bwmask
-            # props  = regionprops(label(bwtemp, return_num = False), cache = False)
             bwlabel, num_of_labels = label(bwtemp, structure = strel, output = np.int32)
+
+            bwtemp = hipass < -threshold
+            if not bwmask is None: bwtemp &= bwmask
+            bwlabel[bwtemp] = label(bwtemp, structure = strel, output = np.int32)[0][bwtemp] + num_of_labels
+
             props  = regionprops(bwlabel, cache = False)
             if verbose: print(performance_time(f"detecting {len(props)} objects", start))
 
-            weights = np.ones((num_of_labels + 1,), dtype = np.float32)
-            # bwtemp = 1 - bwtemp.astype(np.float32)
+            num_of_labels = len(props)
             bwtemp = np.ones(hipass.shape, dtype = np.float32)
             max_angle = sin(radians(params.max_angle))
             max_ratio = params.max_ratio
@@ -1972,8 +1975,6 @@ def milling_correction(source, residual = None, sigma = 0.25, nbhood = 97, metho
 
     middle = np.expand_dims(z + np.reciprocal(1.0 - diff[y, x, z + 1] / (diff[y, x, z] + EPS), dtype = np.float32), axis = -1)
     weight = GAUSSIAN(np.arange(0, diff.shape[-1], dtype = np.float32).reshape((1, 1, -1)) - middle, sigma * np.sqrt(1 + np.abs(middle - center)))
-    # weight = GAUSSIAN(np.arange(0, diff.shape[-1], dtype = np.float32).reshape((1, 1, -1)) - middle, sigma)
-    # weight = GAUSSIAN(middle - np.arange(0, diff.shape[-1], dtype = np.float32).reshape((1, 1, -1)), sigma)
     return np.sum(weight * source, axis = -1) / np.sum(weight, axis = -1)
 
 
