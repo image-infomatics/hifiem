@@ -61,6 +61,65 @@ scikit-learn>=0.24.2
 scipy>=1.6.2
 opencv>=4.5.5
 ```
+# Explanation of parameters
+
+## Recommended Parameters for deband_v_3_00 Function
+
+| Parameter      | Description                                                                                           | Recommended Value(s)                |
+|----------------|-------------------------------------------------------------------------------------------------------|-------------------------------------|
+| direction      | Specifies bands direction ('horizontal' / 'vertical')                                                 | "vertical"                          |
+| scales         | Number of scales to be processed                                                                      | 6                                   |
+| adjust_beta    | Specifies whether the scale debanding should be adjusted for low pass filtering                       | True                                |
+| details        | Parameters used to calculate stripe-limiting threshold                                                | {"start": 2.1, "end": 1.5, "middle": 0.6, "mul": 20, "len": 187} |
+| destripe       | De-striping method and parameters for each frequency band                                             | See below                           |
+| verbose        | Specifies whether to display verbose output                                                           | True or False                       |
+
+### destripe Parameters
+
+destripe parameter contains a list of dictionaries, where each entry specifies parameters for the corresponding scale. Please, look into `pipeline` notebook to see an example of usage
+
+| Parameter    | Description                                                                                        |
+|--------------|----------------------------------------------------------------------------------------------------|
+| method       | Method of stripe approximation (only **"predict"** method is covered by the article)               |
+| bands_len    | Length of the stripe to be used for debanding of each scale                                        |
+| mask_len     | Size of two-dimensional window used for averaging of weight matrix                                 |
+| max_angle    | Maximum angle for connected components formed by pixels                                            |
+| max_ratio    | Maximum ratio for connected components formed by pixels                                            |
+| thresh_mul   | Multiplier used for adjusting threshold values                                                     |
+
+| Entry | method  | bands_len | mask_len | max_angle | max_ratio | thresh_mul |
+|-------|---------|-----------|----------|-----------|-----------|------------|
+| 1     | predict | 161       | 5        | 4.8       | 0.3       | 1.67       |
+| 2     | predict | 161       | 9        | 4.8       | 0.3       | *omitted*  |
+| 3     | predict | 161       | 13       | 4.8       | 0.3       | *omitted*  |
+| 4     | predict | 201       | 19       | 4.8       | 0.3       | *omitted*  |
+| 5     | predict | 251       | 43       | 4.8       | 0.3       | *omitted*  |
+| 6     | predict | 301       | 75       | 4.8       | 0.3       | *omitted*  |
+
+* if `thresh_mul` key is *omitted* the function assumes that it equals to `1`
+
+## Recommended Parameters for adjust_histogram_v_3_02 Function
+
+| Parameter         | Description                                                                                            | Recommended Value(s)     |
+|-------------------|--------------------------------------------------------------------------------------------------------|--------------------------|
+| drange            | Scalar or two-elements tuple, optional.                                                                | (0, 255)                 |
+| dtype             | Numpy dtype, optional.                                                                                | np.uint8                 |
+| bwmask            | Boolean ndarray of the same shape as image. Itprovides binary mask to mark ROI pixels. The default is None, which states for entire image to be included                  | None                     |
+| smoothing         | Integer, length of smoothing filter used to retrieve lopass component of the image, default is 501.  | 501                      |
+| method            | Method to be used for auto-level enhancement (local contrast enhancement), default is "image" and only this method is covered by the manuscript. | "image"                  |
+| sigma             | Float, optional. σ<sub>a</sub> parameter of LCE approach, default is 7.5. Depends on the active range of intensities  | *depends on image* |
+| offset            | Float, optional. γ parameter of LCE approach. Default is -15. Depends on image characteristics and desired outcome               | *depends on image* |
+| ratio             | Float, optional. α parameter of LCE approach. Default is 2. Controls a strength of local contrast enhancement  | 2                        |
+| minmax_size       | Integer, optional. size of structure element (Ω) used for morhological dilation and erosion for LCE.  | 9                        |
+| compress_range    | List or np.array of 2 values, optional. *Not covered in the article and isn't used in the processing* | None                     |
+| compress_ratio    | Float value in range [0..1], optional. *Not covered in the article and isn't used in the processing*  | 0.1                      |
+| clip              | Scalar or array-like variable of 2, optional. Use [-1 1] to reproduce GCA method described in the article | [-1.0, 1.0]          |
+| redistribute      | String, optional. The article describes only "leftmost" method of redistribution for GCA              | "leftmost"               |
+| hp_sigma          | Numeric, optional. σ parameter of GCA method covered by the article.                                  | *depends on image*       |
+| mean              | Numeric, optional. μ parameter of GCA method covered by the article.                                  | *depends on image*       |
+| save_memory       | Boolean, optional.                                                                                    | True                     |
+
+
 
 # FAQ
 ## How many scales are in step 1 of de-stripping? How do you determine how many scales are needed?
