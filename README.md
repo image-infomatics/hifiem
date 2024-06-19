@@ -60,6 +60,7 @@ scikit-image>=0.18.1
 scikit-learn>=0.24.2
 scipy>=1.6.2
 opencv>=4.5.5
+tqdm
 ```
 # Explanation of parameters
 
